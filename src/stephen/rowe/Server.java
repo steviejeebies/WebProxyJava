@@ -1,5 +1,6 @@
 package stephen.rowe;
 
+import javax.swing.*;
 import java.net.*;
 import java.io.*;
 import java.util.concurrent.ExecutorService;
@@ -19,7 +20,15 @@ public class Server extends Thread {
     private ServerSocket serverSocket;
 
     public void start(int port) throws IOException {
+        System.out.println("INPUT SITES YOU WANT TO BLOCK AS VALID REGULAR EXPRESSIONS:");
+
         serverSocket = new ServerSocket(port);
+
+        // For our output terminal
+        SwingUtilities.invokeLater(() ->
+                new OutputTerminal().setVisible(true)
+        );
+
         // Server constantly accepts clients at its port.
         while (true)
             new ServerThread(serverSocket.accept()).start();

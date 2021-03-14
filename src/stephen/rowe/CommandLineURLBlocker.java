@@ -1,11 +1,9 @@
 package stephen.rowe;
 
-import java.util.ArrayList;
-import java.util.Optional;
 import java.util.Scanner;
 import java.util.regex.*;
 
-public class CommandLine extends Thread {
+public class CommandLineURLBlocker extends Thread {
 
     static private String blockedPattern = "(";
     static private boolean blockedPatternHasBeenChanged = true;
@@ -38,7 +36,7 @@ public class CommandLine extends Thread {
         return blockedPattern + ")";
     }
 
-    public CommandLine() {
+    public CommandLineURLBlocker() {
         // The user will input the sites they want to block
         // into the command line, with regular expressions.
         // So we need to retain a list of regex expressions,
@@ -57,7 +55,7 @@ public class CommandLine extends Thread {
                 try {
                     // Test to see if it is a valid regex expression
                     Pattern test = Pattern.compile(newRegex);
-                    CommandLine.addBlockedSite(newRegex);
+                    CommandLineURLBlocker.addBlockedSite(newRegex);
                     System.out.println("ACCEPTED NEW BLOCKING REGEX: \"" + newRegex + "\"");
 
                 } catch (Exception e) {
