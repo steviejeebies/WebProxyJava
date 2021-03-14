@@ -13,7 +13,6 @@ class ServerThread extends Thread {
 
     public ServerThread(Socket socket) throws IOException {
         this.browserClient = socket;
-        this.browserClient.setSoTimeout(5 * 1000);
         proxyToClientBw = new BufferedWriter(new OutputStreamWriter(browserClient.getOutputStream()) );
     }
 
