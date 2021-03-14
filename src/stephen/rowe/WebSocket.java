@@ -6,15 +6,12 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 
-public class SendFromClientToServer implements Runnable{
-
-    InputStream proxyToClientIS;
-    OutputStream proxyToServerOS;
+public class WebSocket implements Runnable {
     Socket proxyToServerSocket;
     Socket browserClient;
-    public SendFromClientToServer(Socket proxyToServerSocket, Socket browserClient) {
-        this.proxyToServerSocket = proxyToServerSocket;
-        this.browserClient = browserClient;
+    public WebSocket(Socket remoteServerSocket, Socket browserSocket) {
+        this.proxyToServerSocket = remoteServerSocket;
+        this.browserClient = browserSocket;
     }
 
     public void run() {
@@ -35,11 +32,10 @@ public class SendFromClientToServer implements Runnable{
                         }
                     }
                 } while (read >= 0);
-            } catch (SocketTimeoutException ste) {
-                // TODO: handle exception
+            } catch (SocketTimeoutException e) {
+                System.out.println("Socket timeout");
             } catch (IOException e) {
-
-                e.printStackTrace();
+                System.out.println("Proxy to client HTTPS read timed out");
             }
 
             try {

@@ -1,7 +1,6 @@
 package stephen.rowe;
 
 import java.io.*;
-import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 
@@ -40,8 +39,8 @@ public class HTTPSHandler extends Thread {
             BufferedReader proxyToServerBR = new BufferedReader(new InputStreamReader(proxyToServerSocket.getInputStream()));
 
             // Create a new thread to listen to client and transmit to server
-            SendFromClientToServer clientToServerHttps =
-                    new SendFromClientToServer(proxyToServerSocket, browserClient);
+            WebSocket clientToServerHttps =
+                    new WebSocket(proxyToServerSocket, browserClient);
 
             (new Thread(clientToServerHttps)).start();
 //            Server.executor.execute(clientToServerHttps);
