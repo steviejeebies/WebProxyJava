@@ -21,6 +21,7 @@ public class HTTPHandler extends Thread {
 //        System.out.println(fullHTTPRequest);
 //        System.out.println("NOT FROM SERVER ABOVE");
 
+        // TODO - ABSTRACT OUT THIS
         byte[] buffer = new byte[4096];
         int read;
         do {

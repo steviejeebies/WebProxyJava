@@ -3,8 +3,24 @@ package stephen.rowe;
 import java.util.Scanner;
 import java.util.regex.*;
 
-public class CommandLineURLBlocker extends Thread {
+// This class has two purposes:
+// 1. To take in input from the user on the command line (in IDE,
+//    not in the Swing window).
+// 2. Keeps track of the blocked websites, and provides the
+//    isSiteBlocked() function that can be used anywhere in the
+//    program
 
+// The user will input the sites they want to block
+// into the command line, with regular expressions.
+// So we need to retain a list of regex expressions,
+// to test any given HTTP url request against.
+// I will implement this with a string, which will
+// look something like this: "(mywebsite\\.com|yousomething\\.com|...)"
+// This will save storing every single string and iterating
+// for every single pattern, we can just match once for the whole
+// list of regexes.
+
+public class CommandLineURLBlocker extends Thread {
     static private String blockedPattern = "(";
     static private boolean blockedPatternHasBeenChanged = true;
     static private Pattern regex;
@@ -13,14 +29,14 @@ public class CommandLineURLBlocker extends Thread {
     static public boolean isSiteBlocked (String URL) {
         if (blockedPattern.length() <= 1) return false;
 
+        // if our concatenated regular expression has been
+        // added to since the last time we called this function,
+        // then we need to re-compile the regex pattern.
         if (blockedPatternHasBeenChanged) {
             regex = Pattern.compile(blockedPattern + ")");
             blockedPatternHasBeenChanged = false;
         }
-
-        Matcher testAgainstURL = regex.matcher(URL);
-
-        return testAgainstURL.matches();
+        return regex.matcher(URL).matches();
     }
 
     static public void addBlockedSite(String regularExpression) {
@@ -37,14 +53,7 @@ public class CommandLineURLBlocker extends Thread {
     }
 
     public CommandLineURLBlocker() {
-        // The user will input the sites they want to block
-        // into the command line, with regular expressions.
-        // So we need to retain a list of regex expressions,
-        // to test a HTTP url request against
-        // I will implement this with a string, which will
-        // look something like this: "(mywebsite\\.com|yousomething\\.com|...)"
-        // This will save storing every single string and iterating
-        // for every single pattern
+
         scanner = new Scanner(System.in);
     }
     public void run() {
@@ -66,7 +75,7 @@ public class CommandLineURLBlocker extends Thread {
                 }
             }
             try {
-                Thread.sleep(1500);
+                Thread.sleep(2 * 1000);     // check for new input every 2 seconds
             } catch (InterruptedException e) {}
         }
     }

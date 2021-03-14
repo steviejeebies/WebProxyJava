@@ -20,6 +20,10 @@ import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+//
+// You can ignore this class, I just used it for experimenting
+//
+
 public class Main {
     public int parseAndMul10(String x) {
         return Integer.parseInt(x) * 10;

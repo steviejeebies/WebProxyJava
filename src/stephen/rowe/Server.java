@@ -6,10 +6,7 @@ import java.io.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-// This is the "Server" part of my proxy. It accepts any
-// connections at its port number, and will create a new
-// thread for each request.
-
+// This class serves as the entry point of the application.
 public class Server extends Thread {
 
     // Static ExecutorService allows us to limit the number of

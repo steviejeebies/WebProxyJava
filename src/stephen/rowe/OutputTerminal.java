@@ -11,7 +11,7 @@ import java.awt.GridBagLayout;
 
 public class OutputTerminal extends JFrame {
     private JTextArea jTextArea;
-    private PrintStream reference;
+    private PrintStream reference = System.out;
 
     public OutputTerminal() {
         super("PROXY INFO");
@@ -19,7 +19,10 @@ public class OutputTerminal extends JFrame {
         jTextArea = new JTextArea(50, 10);
         PrintStream streamToTextArea = new PrintStream(new JTextAreaOutputStream(jTextArea));
 
-        reference = System.out;
+        // Change the System.out for both standard-out and error
+        // to display on this text box. This is so that the
+        // console in the IDE is not clogged up while the user
+        // wants to write their regular expressions.
         System.setOut(streamToTextArea);
         System.setErr(streamToTextArea);
 

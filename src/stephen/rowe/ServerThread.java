@@ -1,21 +1,23 @@
 package stephen.rowe;
 
-import java.io.*;
-import java.net.*;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.Socket;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 class ServerThread extends Thread {
-    // this regex is used for extracting header information from a HTTP request (not a HTTPS request).
+    // this regex is used for extracting header information from a HTTP request,
+    // mainly for getting the HOST value in the HTTP header for calls other than CONNECT
     static Pattern hostAddress = Pattern.compile("^Host: ([^\\r\\n]*)\\r\\n", Pattern.MULTILINE);
 
-    private Socket browserClient;
-    BufferedWriter proxyToClientBw;
+    private Socket browserSocket;
+//    BufferedWriter proxyToClientBw;
 
     public ServerThread(Socket socket) throws IOException {
-        this.browserClient = socket;
-        proxyToClientBw = new BufferedWriter(new OutputStreamWriter(browserClient.getOutputStream()));
+        this.browserSocket = socket;
+        //  proxyToClientBw = new BufferedWriter(new OutputStreamWriter(browserSocket.getOutputStream()));
     }
 
     public void run() {
@@ -25,9 +27,9 @@ class ServerThread extends Thread {
             // First, we need to look at the input from the Browser/Client. We only need to look
             // at the first line for the moment, to see what type of request it is.
             Scanner inputFromClient =
-                    new Scanner(new InputStreamReader(browserClient.getInputStream()));
+                    new Scanner(new InputStreamReader(browserSocket.getInputStream()));
 
-            // Just appending it with \r\n incase we need this later
+            // Just re-appending it with "\r\n" in-case we need this later
             String topLineHTTPRequest = inputFromClient.nextLine() + "\r\n";
 
             if (topLineHTTPRequest == null) {
@@ -38,25 +40,28 @@ class ServerThread extends Thread {
 
             // This will extract out header info, using regular expressions
             HeaderHTTP header = new HeaderHTTP(topLineHTTPRequest);
+            // This first check of isSiteBlocked() will only work on the CONNECT
+            // call-type, as it is the only one that has the web-server it is
+            // connecting to in the first line of the header, the rest usually
+            // have the host server on its own line in the header.
             boolean siteBlocked = CommandLineURLBlocker.isSiteBlocked(header.getUrlFromFirstLine());
 
             switch (header.getHttpCallType()) {
                 case "CONNECT":
                     if (siteBlocked) {
-                        // We block
-                        browserClient.getOutputStream().write(Constants.CONNECTION_BLOCKED.getBytes());
-                        browserClient.getOutputStream().flush();
-                        browserClient.close();
+                        browserSocket.getOutputStream().write(Constants.CONNECTION_BLOCKED.getBytes());
+                        browserSocket.getOutputStream().flush();
+                        browserSocket.close();
                         return;
                     } else if (header.getPortNumber() == 443)  // if it a HTTPS request
-                        new HTTPSHandler(browserClient, header).start();
+                        new HTTPSHandler(browserSocket, header).start();
                     else if (header.getPortNumber() == 80) {
                         // For simplicity's sake, if the Browser makes a CONNECT call
                         // then I'll treat a HTTP call as a HTTPS call, because the
-                        // code for CONNECT that I have running now seems very fragile
+                        // code for CONNECT that I have running now seems to be very fragile
                         // and I don't want to mess with it. Any other type of HTTP header,
                         // it will fall down to the 'default' case of this switch block.
-                        new HTTPSHandler(browserClient, header).start();
+                        new HTTPSHandler(browserSocket, header).start();
                     }
                     break;
 //              case "GET":
@@ -64,280 +69,26 @@ class ServerThread extends Thread {
                 default:
                     // originally intended for each HTTP call type to
                     // have its own case here, but there's no need, as we
-                    // treat all of them essentially the same
-//                    sendNonCachedToClient(header.getUrlFromFirstLine());
-                    // each way of splitting the head from the body:
+                    // treat all of them essentially the same.
+
+                    // easy way of splitting the head from the body:
                     inputFromClient.useDelimiter("\\r\\n\\r\\n");
-                    String fullHeader = topLineHTTPRequest +
-                            (inputFromClient.hasNext() ? inputFromClient.next() : "");
-                    Matcher headerMatch = hostAddress.matcher(fullHeader);
+                    // Caught on something simple here, if I check to see
+                    // if there is a body with hasNext(), then it will block
+                    // here, which is no good. So I decided to just stick with
+                    // the header I've extracted already and throw that to
+                    // the remote server.
+                    Matcher headerMatch = hostAddress.matcher(topLineHTTPRequest);
                     if (headerMatch.find()) {
                         String serverAddress = headerMatch.group(1);
-                        String fullHTTPRequest = fullHeader + "\r\n\r\n";
-                        new HTTPHandler(browserClient, serverAddress, fullHTTPRequest).start();
+                        String fullHTTPRequest = topLineHTTPRequest + "\r\n\r\n";
+                        new HTTPHandler(browserSocket, serverAddress, fullHTTPRequest).start();
                     }
 
 
             }
-        } catch (Exception e) { }
+        } catch (Exception e) {
 
-
-        // Get the Request type
-
-
-//        // Check if site is blocked
-//        if(Proxy.isBlocked(urlString)){
-//            System.out.println("Blocked site requested : " + urlString);
-//            blockedSiteRequested();
-//            return;
-//        }
-
-
-//        else{
-//            // Check if we have a cached copy
-////            File file;
-////            if((file = Proxy.getCachedPage(urlString)) != null){
-////                System.out.println("Cached Copy found for : " + urlString + "\n");
-////                sendCachedPageToClient(file);
-////            } else {
-//                System.out.println("HTTP GET for : " + urlString + "\n");
-//            try {
-//                sendNonCachedToClient(urlString);
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-////            }
-//        }
-    }
-
-
-    private void sendNonCachedToClient(String urlString) throws IOException {
-
-        try {
-//
-//            // Compute a logical file name as per schema
-//            // This allows the files on stored on disk to resemble that of the URL it was taken from
-//            int fileExtensionIndex = urlString.lastIndexOf(".");
-//            String fileExtension;
-//
-//            // Get the type of file
-//            fileExtension = urlString.substring(fileExtensionIndex, urlString.length());
-//
-//            // Get the initial file name
-//            String fileName = urlString.substring(0,fileExtensionIndex);
-//
-//
-//            // Trim off http://www. as no need for it in file name
-//            fileName = fileName.substring(fileName.indexOf('.')+1);
-//
-//            // Remove any illegal characters from file name
-//            fileName = fileName.replace("/", "__");
-//            fileName = fileName.replace('.','_');
-//
-//            // Trailing / result in index.html of that directory being fetched
-//            if(fileExtension.contains("/")){
-//                fileExtension = fileExtension.replace("/", "__");
-//                fileExtension = fileExtension.replace('.','_');
-//                fileExtension += ".html";
-//            }
-//
-//            fileName = fileName + fileExtension;
-//
-//
-//
-//            // Attempt to create File to cache to
-//            boolean caching = true;
-//            File fileToCache = null;
-//            BufferedWriter fileToCacheBW = null;
-//
-//            try{
-//                // Create File to cache
-//                fileToCache = new File("cached/" + fileName);
-//
-//                if(!fileToCache.exists()){
-//                    fileToCache.createNewFile();
-//                }
-//
-//                // Create Buffered output stream to write to cached copy of file
-//                fileToCacheBW = new BufferedWriter(new FileWriter(fileToCache));
-//            }
-//            catch (IOException e){
-//                System.out.println("Couldn't cache: " + fileName);
-//                caching = false;
-//                e.printStackTrace();
-//            } catch (NullPointerException e) {
-//                System.out.println("NPE opening file");
-//            }
-//
-//
-//
-//
-//
-//            // Check if file is an image
-//            if((fileExtension.contains(".png")) || fileExtension.contains(".jpg") ||
-//                    fileExtension.contains(".jpeg") || fileExtension.contains(".gif")){
-//                // Create the URL
-//                URL remoteURL = new URL(urlString);
-//                BufferedImage image = ImageIO.read(remoteURL);
-//
-//                if(image != null) {
-//                    // Cache the image to disk
-//                    ImageIO.write(image, fileExtension.substring(1), fileToCache);
-//
-//                    // Send response code to client
-//                    String line = "HTTP/1.0 200 OK\n" +
-//                            "Proxy-agent: ProxyServer/1.0\n" +
-//                            "\r\n";
-//                    proxyToClientBw.write(line);
-//                    proxyToClientBw.flush();
-//
-//                    // Send them the image data
-//                    ImageIO.write(image, fileExtension.substring(1), clientSocket.getOutputStream());
-//
-//                    // No image received from remote server
-//                } else {
-//                    System.out.println("Sending 404 to client as image wasn't received from server"
-//                            + fileName);
-//                    String error = "HTTP/1.0 404 NOT FOUND\n" +
-//                            "Proxy-agent: ProxyServer/1.0\n" +
-//                            "\r\n";
-//                    proxyToClientBw.write(error);
-//                    proxyToClientBw.flush();
-//                    return;
-//                }
-//            }
-//
-//            // File is a text file
-//            else {
-
-            // Create the URL
-            URL remoteURL = new URL(urlString);
-            // Create a connection to remote server
-            HttpURLConnection proxyToServerCon = (HttpURLConnection) remoteURL.openConnection();
-            proxyToServerCon.setRequestProperty("Content-Type",
-                    "application/x-www-form-urlencoded");
-            proxyToServerCon.setRequestProperty("Content-Language", "en-US");
-            proxyToServerCon.setUseCaches(false);
-            proxyToServerCon.setDoOutput(true);
-
-            // Create Buffered Reader from remote Server
-            BufferedReader proxyToServerBR = new BufferedReader(new InputStreamReader(proxyToServerCon.getInputStream()));
-
-
-            // Send success code to client
-            String line = "HTTP/1.0 200 OK\n" +
-                    "Proxy-agent: ProxyServer/1.0\n" +
-                    "\r\n";
-            proxyToClientBw.write(line);
-
-
-            // Read from input stream between proxy and remote server
-            while ((line = proxyToServerBR.readLine()) != null) {
-                // Send on data to client
-                proxyToClientBw.write(line);
-
-//                    // Write to our cached copy of the file
-//                    if(caching){
-//                        fileToCacheBW.write(line);
-//                    }
-            }
-
-            // Ensure all data is sent by this point
-            proxyToClientBw.flush();
-
-            // Close Down Resources
-            if (proxyToServerBR != null) {
-                proxyToServerBR.close();
-            }
-        } catch (MalformedURLException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-
-//            if(caching){
-//                // Ensure data written and add to our cached hash maps
-//                fileToCacheBW.flush();
-//                Proxy.addCachedPage(urlString, fileToCache);
-//            }
-
-//            // Close down resources
-//            if(fileToCacheBW != null){
-//                fileToCacheBW.close();
-//            }
-
-        if (proxyToClientBw != null) {
-            proxyToClientBw.close();
         }
     }
 }
-
-//    public void run() {
-//        try {
-//
-//            // Using this delimiter to separate the HTTP header from the body
-//            Scanner s = new Scanner(browserIn).useDelimiter("\\r\\n\\r\\n");
-//
-//            String header = "";
-//            if (s.hasNext()) header = s.next();
-//            String body = "";
-//            if (s.hasNext()) body = s.next();
-//            System.out.println(header);
-//            // Regex to get the HTTP message type, the URL, and the port (for the moment, assuming this will be a
-//            // CONNECT message)
-//            Matcher callRegex = Pattern.compile("^(GET|POST|CONNECT|HEAD|PUT|DELETE) (https?://)?([^ :]*):?([0-9]*)?").matcher(header);
-//            if(header != null) System.out.println(header);
-//
-////            System.out.println(Thread.currentThread().getName());
-////            System.out.println("Active Threads: " + Thread.activeCount());
-//
-//            if(callRegex.find()) {
-//                // Extract relevant info from the Regex
-//                String httpHeaderType = callRegex.group(1);
-//                String serverName = callRegex.group(3);
-//                int port = (callRegex.group(4).equals("")) ? 80 : Integer.parseInt(callRegex.group(4));
-//
-//                switch (httpHeaderType) {
-//                    case "CONNECT":
-//                        // Just for debugging, I wanted to see how this was called:
-//                        System.out.println("Socket forwardSocket = new Socket(\"" + serverName + "\", " + port + ");");
-//
-//                        // So we make a new socket to the Server that Firefox is trying to connect to:
-//                        Socket forwardSocket = new Socket(serverName, port);
-//                        forwardSocket.setSoTimeout(10 * 1000);
-//
-//                        // Readers and Printers to the outside Server
-//                        InputStream serverIn = forwardSocket.getInputStream();
-//                        PrintStream serverOut = new PrintStream(forwardSocket.getOutputStream());
-//
-//                        // Send the server the exact header that Firefox sent us:
-//                        forwardSocket.getOutputStream().write(header.getBytes());
-//                        forwardSocket.getOutputStream().flush();
-//
-//                        byte buffer [] = new byte [4096];
-//                        serverIn.read(buffer);
-//                        if(buffer.length > 0) {
-//                            System.out.println("Something returned!");
-//                        }
-//                        else {
-//                            System.out.println("Nothing returned!");
-//                        }
-//
-//                        byte bufferClient[] = new byte [4096];
-//                        clientSocket.getOutputStream().write(buffer);
-//                        clientSocket.getOutputStream().flush();
-//
-//
-//                }
-//
-//            } else {
-//                clientSocket.close();
-//            }
-////
-//
-//        } catch (IOException e) {
-//            System.out.println("ERROR");
-//        }
-//    }
-//}
