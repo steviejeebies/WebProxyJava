@@ -5,7 +5,7 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 
 public class HTTPSHandler extends Thread {
-    public HTTPSHandler(Socket browserClient, HTTPHeader header) throws IOException {
+    public HTTPSHandler(Socket browserClient, HeaderHTTP header) throws IOException {
         BufferedWriter proxyToClientBw;
         proxyToClientBw = new BufferedWriter(new OutputStreamWriter(browserClient.getOutputStream()) );
 

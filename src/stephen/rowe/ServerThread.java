@@ -9,14 +9,11 @@ class ServerThread extends Thread {
 
 
     private Socket browserClient;
-    private Thread httpsClientToServer;
     BufferedWriter proxyToClientBw;
 
     public ServerThread(Socket socket) throws IOException {
         this.browserClient = socket;
         this.browserClient.setSoTimeout(5 * 1000);
-//        String requestString = null;
-//        inputFromClient = new BufferedReader(new InputStreamReader(browserClient.getInputStream()) );
         proxyToClientBw = new BufferedWriter(new OutputStreamWriter(browserClient.getOutputStream()) );
     }
 
@@ -26,30 +23,33 @@ class ServerThread extends Thread {
         try {
             // First, we need to look at the input from the Browser/Client. We only need to look
             // at the first line for the moment, to see what type of request it is.
-//            BufferedReader inputFromClient =
             BufferedReader inputFromClient =
                     new BufferedReader (new InputStreamReader(browserClient.getInputStream()) );
 
-            // We need to append this with \r\n for when we're sending the actual
-            // header on, as readLine() will omit this
+            // Just appending it with \r\n incase we need this later
             String topLineHTTPRequest = inputFromClient.readLine() + "\r\n";
+
             if(topLineHTTPRequest == null) {
+                // Nothing much we can do other than return
                 System.out.println("ERROR: COULDN'T READ REQUEST");
                 return;
             }
 
             // This will extract out header info, using regular expressions
-            HTTPHeader header = new HTTPHeader(topLineHTTPRequest);
+            HeaderHTTP header = new HeaderHTTP(topLineHTTPRequest);
 
             switch(header.getHttpCallType()) {
                 case "CONNECT":
                     // We create a new thread for HTTPSHandler, and execute it
                     (new HTTPSHandler(browserClient, header)).start();
                     break;
+//                case "GET":
+//                case "POST":
                 default:
-                    // wouldn't make any sense that this switch block could
-                    // reach this, but we'll have it as a fallback.
-                    System.out.println("ERROR: HTTP call type invalid!");
+                    // originally intended for each HTTP call type to
+                    // have its own case here, but there's no need, as we
+                    // treat all of them essentially the same
+                    sendNonCachedToClient(header.getUrlFromFirstLine());
             }
 
         } catch (IOException e) {

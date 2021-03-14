@@ -21,9 +21,10 @@ public class Server extends Thread {
 
     public void start(int port) throws IOException {
         System.out.println("INPUT SITES YOU WANT TO BLOCK AS VALID REGULAR EXPRESSIONS:");
-        System.out.println("MUST BE FORMATTED AS A JAVA STRING (I.E. \"YOUTUBE\\.COM\"");
+        System.out.println("MUST BE FORMATTED AS A JAVA STRING (I.E. \"YOUTUBE\\\\.COM\")");
         serverSocket = new ServerSocket(port);
 
+        // For our command line functionality of blocking sites dynamically
         new Thread(new CommandLineURLBlocker()).start();
 
         // For our output terminal

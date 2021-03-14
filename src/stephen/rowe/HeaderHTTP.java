@@ -1,7 +1,7 @@
 package stephen.rowe;
 import java.util.regex.*;
 
-public class HTTPHeader {
+public class HeaderHTTP {
     static final String regexForTopLine = "^(GET|POST|CONNECT|HEAD|PUT|DELETE) (https?://)?([^ :]*):?([0-9]*)?";
     static final Pattern regexTopHeaderLine = Pattern.compile(regexForTopLine);
 
@@ -21,7 +21,7 @@ public class HTTPHeader {
         return portNumber;
     }
 
-    public HTTPHeader(String firstLineHeader) {
+    public HeaderHTTP(String firstLineHeader) {
         Matcher regexMatchTopLine = regexTopHeaderLine.matcher(firstLineHeader);
         if(regexMatchTopLine.find()) {
             this.httpCallType = regexMatchTopLine.group(1);
