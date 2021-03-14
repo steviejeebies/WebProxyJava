@@ -33,6 +33,10 @@ public class Main {
     }
 
     public static void main(String [] args) {
+        Pattern hostAddress = Pattern.compile("^Host: ([^\\r\\n]*)\\r\\n", Pattern.MULTILINE);
+        Matcher match = hostAddress.matcher("GET http://neverssl.com/ HTTP/1.1\r\nHost: neverssl.com\r\nUser-Agent");
+        match.find();
+        System.out.println("FOUND:"+match.group(1)+"0");
 
 
         // .mapToInt returns an IntStream consisting of the results of applying

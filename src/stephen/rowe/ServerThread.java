@@ -2,18 +2,20 @@ package stephen.rowe;
 
 import java.io.*;
 import java.net.*;
+import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 class ServerThread extends Thread {
-    // I'll use Regex to determine what kind of call this is/extract useful info from the header.
-    // Static so that we only declare this once and it will be shared across threads.
-
+    // this regex is used for extracting header information from a HTTP request (not a HTTPS request).
+    static Pattern hostAddress = Pattern.compile("^Host: ([^\\r\\n]*)\\r\\n", Pattern.MULTILINE);
 
     private Socket browserClient;
     BufferedWriter proxyToClientBw;
 
     public ServerThread(Socket socket) throws IOException {
         this.browserClient = socket;
-        proxyToClientBw = new BufferedWriter(new OutputStreamWriter(browserClient.getOutputStream()) );
+        proxyToClientBw = new BufferedWriter(new OutputStreamWriter(browserClient.getOutputStream()));
     }
 
     public void run() {
@@ -22,13 +24,13 @@ class ServerThread extends Thread {
         try {
             // First, we need to look at the input from the Browser/Client. We only need to look
             // at the first line for the moment, to see what type of request it is.
-            BufferedReader inputFromClient =
-                    new BufferedReader (new InputStreamReader(browserClient.getInputStream()) );
+            Scanner inputFromClient =
+                    new Scanner(new InputStreamReader(browserClient.getInputStream()));
 
             // Just appending it with \r\n incase we need this later
-            String topLineHTTPRequest = inputFromClient.readLine() + "\r\n";
+            String topLineHTTPRequest = inputFromClient.nextLine() + "\r\n";
 
-            if(topLineHTTPRequest == null) {
+            if (topLineHTTPRequest == null) {
                 // Nothing much we can do other than return
                 System.out.println("ERROR: COULDN'T READ REQUEST");
                 return;
@@ -36,31 +38,48 @@ class ServerThread extends Thread {
 
             // This will extract out header info, using regular expressions
             HeaderHTTP header = new HeaderHTTP(topLineHTTPRequest);
+            boolean siteBlocked = CommandLineURLBlocker.isSiteBlocked(header.getUrlFromFirstLine());
 
-            switch(header.getHttpCallType()) {
+            switch (header.getHttpCallType()) {
                 case "CONNECT":
-                    // We create a new thread for HTTPSHandler, and execute it
-                    if(!CommandLineURLBlocker.isSiteBlocked(header.getUrlFromFirstLine()))
-                        new HTTPSHandler(browserClient, header).start();
-                    else {
+                    if (siteBlocked) {
                         // We block
                         browserClient.getOutputStream().write(Constants.CONNECTION_BLOCKED.getBytes());
                         browserClient.getOutputStream().flush();
                         browserClient.close();
+                        return;
+                    } else if (header.getPortNumber() == 443)  // if it a HTTPS request
+                        new HTTPSHandler(browserClient, header).start();
+                    else if (header.getPortNumber() == 80) {
+                        // For simplicity's sake, if the Browser makes a CONNECT call
+                        // then I'll treat a HTTP call as a HTTPS call, because the
+                        // code for CONNECT that I have running now seems very fragile
+                        // and I don't want to mess with it. Any other type of HTTP header,
+                        // it will fall down to the 'default' case of this switch block.
+                        new HTTPSHandler(browserClient, header).start();
                     }
                     break;
-//                case "GET":
-//                case "POST":
+//              case "GET":
+//              case "POST":
                 default:
                     // originally intended for each HTTP call type to
                     // have its own case here, but there's no need, as we
                     // treat all of them essentially the same
-                    sendNonCachedToClient(header.getUrlFromFirstLine());
-            }
+//                    sendNonCachedToClient(header.getUrlFromFirstLine());
+                    // each way of splitting the head from the body:
+                    inputFromClient.useDelimiter("\\r\\n\\r\\n");
+                    String fullHeader = topLineHTTPRequest +
+                            (inputFromClient.hasNext() ? inputFromClient.next() : "");
+                    Matcher headerMatch = hostAddress.matcher(fullHeader);
+                    if (headerMatch.find()) {
+                        String serverAddress = headerMatch.group(1);
+                        String fullHTTPRequest = fullHeader + "\r\n\r\n";
+                        new HTTPHandler(browserClient, serverAddress, fullHTTPRequest).start();
+                    }
 
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+
+            }
+        } catch (Exception e) { }
 
 
         // Get the Request type
@@ -72,8 +91,6 @@ class ServerThread extends Thread {
 //            blockedSiteRequested();
 //            return;
 //        }
-
-
 
 
 //        else{
@@ -94,10 +111,9 @@ class ServerThread extends Thread {
     }
 
 
-
     private void sendNonCachedToClient(String urlString) throws IOException {
 
-        try{
+        try {
 //
 //            // Compute a logical file name as per schema
 //            // This allows the files on stored on disk to resemble that of the URL it was taken from
@@ -194,46 +210,46 @@ class ServerThread extends Thread {
 //            // File is a text file
 //            else {
 
-                // Create the URL
-                URL remoteURL = new URL(urlString);
-                // Create a connection to remote server
-                HttpURLConnection proxyToServerCon = (HttpURLConnection)remoteURL.openConnection();
-                proxyToServerCon.setRequestProperty("Content-Type",
-                        "application/x-www-form-urlencoded");
-                proxyToServerCon.setRequestProperty("Content-Language", "en-US");
-                proxyToServerCon.setUseCaches(false);
-                proxyToServerCon.setDoOutput(true);
+            // Create the URL
+            URL remoteURL = new URL(urlString);
+            // Create a connection to remote server
+            HttpURLConnection proxyToServerCon = (HttpURLConnection) remoteURL.openConnection();
+            proxyToServerCon.setRequestProperty("Content-Type",
+                    "application/x-www-form-urlencoded");
+            proxyToServerCon.setRequestProperty("Content-Language", "en-US");
+            proxyToServerCon.setUseCaches(false);
+            proxyToServerCon.setDoOutput(true);
 
-                // Create Buffered Reader from remote Server
-                BufferedReader proxyToServerBR = new BufferedReader(new InputStreamReader(proxyToServerCon.getInputStream()));
+            // Create Buffered Reader from remote Server
+            BufferedReader proxyToServerBR = new BufferedReader(new InputStreamReader(proxyToServerCon.getInputStream()));
 
 
-                // Send success code to client
-                String line = "HTTP/1.0 200 OK\n" +
-                        "Proxy-agent: ProxyServer/1.0\n" +
-                        "\r\n";
+            // Send success code to client
+            String line = "HTTP/1.0 200 OK\n" +
+                    "Proxy-agent: ProxyServer/1.0\n" +
+                    "\r\n";
+            proxyToClientBw.write(line);
+
+
+            // Read from input stream between proxy and remote server
+            while ((line = proxyToServerBR.readLine()) != null) {
+                // Send on data to client
                 proxyToClientBw.write(line);
-
-
-                // Read from input stream between proxy and remote server
-                while((line = proxyToServerBR.readLine()) != null){
-                    // Send on data to client
-                    proxyToClientBw.write(line);
 
 //                    // Write to our cached copy of the file
 //                    if(caching){
 //                        fileToCacheBW.write(line);
 //                    }
-                }
+            }
 
-                // Ensure all data is sent by this point
-                proxyToClientBw.flush();
+            // Ensure all data is sent by this point
+            proxyToClientBw.flush();
 
-                // Close Down Resources
-                if(proxyToServerBR != null){
-                    proxyToServerBR.close();
-                }
-            } catch (MalformedURLException e) {
+            // Close Down Resources
+            if (proxyToServerBR != null) {
+                proxyToServerBR.close();
+            }
+        } catch (MalformedURLException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
@@ -251,11 +267,11 @@ class ServerThread extends Thread {
 //                fileToCacheBW.close();
 //            }
 
-            if(proxyToClientBw != null){
-                proxyToClientBw.close();
-            }
+        if (proxyToClientBw != null) {
+            proxyToClientBw.close();
         }
     }
+}
 
 //    public void run() {
 //        try {

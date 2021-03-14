@@ -6,7 +6,7 @@ import java.net.SocketTimeoutException;
 
 public class HTTPSHandler extends Thread {
     public HTTPSHandler(Socket browserClient, HeaderHTTP header) throws IOException {
-        try{
+        try {
             // Open a socket to the remote server
             Socket proxyToServerSocket = new Socket(header.getUrlFromFirstLine(), header.getPortNumber());
 
@@ -15,38 +15,25 @@ public class HTTPSHandler extends Thread {
             browserClient.getOutputStream().flush();
 
             (new Thread(new WebSocket(proxyToServerSocket, browserClient))).start();
-//            Server.executor.execute(clientToServerHttps);
+//            Server.executor.execute(new WebSocket(proxyToServerSocket, browserClient)));
 
-
-            try {
-                byte[] buffer = new byte[4096];
-                int read;
-                do {
-                    read = proxyToServerSocket.getInputStream().read(buffer);
-                    if (read > 0) {
-                        browserClient.getOutputStream().write(buffer, 0, read);
-                        if (proxyToServerSocket.getInputStream().available() < 1) {
-                            browserClient.getOutputStream().flush();
-                        }
+            byte[] buffer = new byte[4096];
+            int read;
+            do {
+                read = proxyToServerSocket.getInputStream().read(buffer);
+                if (read > 0) {
+                    browserClient.getOutputStream().write(buffer, 0, read);
+                    if (proxyToServerSocket.getInputStream().available() < 1) {
+                        browserClient.getOutputStream().flush();
                     }
-                } while (read >= 0);
-            }
-            catch (SocketTimeoutException e) {
-                System.out.println("Socket timeout");
-            }
-            catch (IOException e) {
-                e.printStackTrace();
-            }
+                }
+            } while (read >= 0);
 
-            // Close Down Resources
-            if(proxyToServerSocket != null){
+            if (proxyToServerSocket != null) {
                 proxyToServerSocket.close();
             }
 
-            // If socket times-out
-        } catch (SocketTimeoutException e) {
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
         }
     }
 }
