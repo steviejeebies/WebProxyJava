@@ -41,7 +41,14 @@ class ServerThread extends Thread {
             switch(header.getHttpCallType()) {
                 case "CONNECT":
                     // We create a new thread for HTTPSHandler, and execute it
-                    (new HTTPSHandler(browserClient, header)).start();
+                    if(!CommandLineURLBlocker.isSiteBlocked(header.getUrlFromFirstLine()))
+                        new HTTPSHandler(browserClient, header).start();
+                    else {
+                        // We block
+                        browserClient.getOutputStream().write(Constants.CONNECTION_BLOCKED.getBytes());
+                        browserClient.getOutputStream().flush();
+                        browserClient.close();
+                    }
                     break;
 //                case "GET":
 //                case "POST":
