@@ -15,6 +15,8 @@ public class HTTPHandler extends Thread {
         remoteServerSocket.getOutputStream().write(fullHTTPRequest.getBytes());
         remoteServerSocket.getOutputStream().flush();
 
+        System.out.println(fullHTTPRequest);
+
 //        System.out.println("NOT FROM SERVER BELOW");
 //        System.out.println(fullHTTPRequest);
 //        System.out.println("NOT FROM SERVER ABOVE");
@@ -23,9 +25,12 @@ public class HTTPHandler extends Thread {
         int read;
         do {
             read = remoteServerSocket.getInputStream().read(buffer);
+
             if (read > 0) {
+                System.out.write(buffer, 0, read);
                 browserClient.getOutputStream().write(buffer, 0, read);
                 if (remoteServerSocket.getInputStream().available() < 1) {
+                    System.out.flush();
                     browserClient.getOutputStream().flush();
                 }
             }
