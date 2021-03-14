@@ -45,11 +45,6 @@ public class HTTPSHandler extends Thread {
             (new Thread(clientToServerHttps)).start();
 //            Server.executor.execute(clientToServerHttps);
 
-
-            SendFromServerToClient serverToClientHttps =
-                    new SendFromServerToClient(proxyToServerSocket, browserClient);
-
-            Server.executor.execute(serverToClientHttps);
 //
 //            (new Thread(serverToClientHttps)).start();
 //             gets input from Server, relays output to Client
